@@ -43,7 +43,7 @@ async function run() {
   await fetch(`https://ntfy.sh/${topic}`, {
     method: "POST",
     headers: {
-      "Title": `🍽️ Mittagstisch Husemeshof – ${dayName}`,
+      "Title": `Mittagstisch Husemeshof – ${dayName}`,
       "Priority": "default",
       "Tags": "fork_and_knife"
     },
