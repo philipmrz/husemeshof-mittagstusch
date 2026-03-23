@@ -1,24 +1,26 @@
 name: Husemeshof Mittagstisch
- 
+
 on:
   schedule:
-    - cron: '30 9 * * 1-5'  # 11:30 Uhr deutscher Zeit (UTC+2 im Sommer)
-  workflow_dispatch:         # Manueller Start per Knopfdruck möglich
- 
+    - cron: '30 9 * * 1-5'
+  workflow_dispatch:
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   mittagstisch:
     runs-on: ubuntu-latest
     steps:
       - name: Repository auschecken
         uses: actions/checkout@v4
- 
+
       - name: Node.js einrichten
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
- 
+          node-version: '24'
+
       - name: Speiseplan abrufen und senden
         env:
           NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
-        run: node husemeshof.js
- 
+        run: node husemeshof_github.js
