@@ -9,10 +9,68 @@ jobs:
   mittagstisch:
     runs-on: ubuntu-latest
     steps:
-      - name: Repository auschecken
-        uses: actions/checkout@v4
-
       - name: Speiseplan abrufen und senden
         env:
           NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
-        run: node husemeshof_github.js
+        run: |
+          python3 << 'EOF'
+          import urllib.request
+          import re
+          import os
+          from datetime import datetime
+
+          # Wochentag ermitteln (0=Mo, 4=Fr, 5=Sa, 6=So)
+          weekday = datetime.now().isoweekday()  # 1=Mo ... 7=So
+          days = {1:"Montag", 2:"Dienstag", 3:"Mittwoch", 4:"Donnerstag", 5:"Freitag"}
+          day_name = days.get(weekday)
+
+          if not day_name:
+              print("Heute geschlossen.")
+              exit(0)
+
+          # Webseite abrufen
+          with urllib.request.urlopen("https://husemeshof.de/mittagstisch") as r:
+              html = r.read().decode("utf-8")
+
+          next_days = {1:"Dienstag, ", 2:"Mittwoch, ", 3:"Donnerstag, ", 4:"Freitag, ", 5:"Download"}
+          start = html.find(day_name + ", ")
+          end   = html.find(next_days[weekday], start)
+          menu  = html[start:end]
+
+          # Bereinigen
+          menu = re.sub(r'<[^>]+>', '', menu)
+          menu = re.sub(r'&bull;', '-', menu)
+          menu = re.sub(r'&#40;', '(', menu)
+          menu = re.sub(r'&#41;', ')', menu)
+          menu = re.sub(r'&amp;', '&', menu)
+          menu = re.sub(r'&nbsp;', ' ', menu)
+          menu = re.sub(r'&#\d+;', '', menu)
+          menu = re.sub(r'&[a-z]+;', '', menu)
+          menu = re.sub(r'\([^)]*\)', '', menu)          # Allergene
+          menu = re.sub(r'\d+,\d+\s*Euro', '', menu)    # Preise
+          lines = menu.split("\n")[1:]                   # Datumszeile weg
+          menu  = "\n".join(lines)
+          menu  = re.sub(r'[ \t]+\n', '\n', menu)
+          menu  = re.sub(r'\n{3,}', '\n\n', menu)
+          menu  = menu.strip()
+
+          print("Menue heute:\n" + menu)
+
+          # Push via ntfy.sh
+          topic = os.environ["NTFY_TOPIC"]
+          title = f"Mittagstisch Husemeshof - {day_name}"
+          data  = menu.encode("utf-8")
+          req   = urllib.request.Request(
+              f"https://ntfy.sh/{topic}",
+              data=data,
+              headers={
+                  "Title": title,
+                  "Priority": "default",
+                  "Tags": "fork_and_knife",
+                  "Content-Type": "text/plain; charset=utf-8"
+              },
+              method="POST"
+          )
+          with urllib.request.urlopen(req) as resp:
+              print("Push gesendet! Status:", resp.status)
+          EOF
