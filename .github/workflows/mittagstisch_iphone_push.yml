@@ -19,6 +19,7 @@ jobs:
           python3 << 'EOF'
           import urllib.request
           import re
+          import html as htmllib
           from datetime import datetime
 
           weekday = datetime.now().isoweekday()
@@ -38,15 +39,11 @@ jobs:
           end   = html.find(next_days[weekday], start)
           menu  = html[start:end]
 
-          menu = re.sub(r'<[^>]+>', '', menu)
-          menu = re.sub(r'&bull;', '-', menu)
-          menu = re.sub(r'&amp;', '&', menu)
-          menu = re.sub(r'&nbsp;', ' ', menu)
-          menu = re.sub(r'&#\d+;', '', menu)
-          menu = re.sub(r'&[a-z]+;', '', menu)
-          menu = re.sub(r'\([^)]*\)', '', menu)
-          menu = re.sub(r'\d+,\d+\s*Euro', '', menu)
-          lines = menu.split("\n")[1:]
+          menu = re.sub(r'<[^>]+>', '', menu)        # Tags entfernen
+          menu = htmllib.unescape(menu)               # ALLE Entities dekodieren
+          menu = re.sub(r'\([^)]*\)', '', menu)       # Allergene + Zusatzstoffe
+          menu = re.sub(r'\d+,\d+\s*Euro', '', menu) # Preise
+          lines = menu.split("\n")[1:]                # Datumszeile weg
           menu  = "\n".join(lines)
           menu  = re.sub(r'[ \t]+\n', '\n', menu)
           menu  = re.sub(r'\n{3,}', '\n\n', menu)
