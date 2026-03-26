@@ -1,0 +1,67 @@
+name: Husemeshof Mittagstisch
+
+on:
+  schedule:
+    - cron: '30 9 * * 1-5'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  mittagstisch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Speiseplan abrufen und speichern
+        run: |
+          python3 << 'EOF'
+          import urllib.request
+          import re
+          from datetime import datetime
+
+          weekday = datetime.now().isoweekday()
+          days = {1:"Montag", 2:"Dienstag", 3:"Mittwoch", 4:"Donnerstag", 5:"Freitag"}
+          day_name = days.get(weekday)
+
+          if not day_name:
+              with open("menu.txt", "w") as f:
+                  f.write("Heute geschlossen.")
+              exit(0)
+
+          with urllib.request.urlopen("https://husemeshof.de/mittagstisch") as r:
+              html = r.read().decode("utf-8")
+
+          next_days = {1:"Dienstag, ", 2:"Mittwoch, ", 3:"Donnerstag, ", 4:"Freitag, ", 5:"Download"}
+          start = html.find(day_name + ", ")
+          end   = html.find(next_days[weekday], start)
+          menu  = html[start:end]
+
+          menu = re.sub(r'<[^>]+>', '', menu)
+          menu = re.sub(r'&bull;', '-', menu)
+          menu = re.sub(r'&amp;', '&', menu)
+          menu = re.sub(r'&nbsp;', ' ', menu)
+          menu = re.sub(r'&#\d+;', '', menu)
+          menu = re.sub(r'&[a-z]+;', '', menu)
+          menu = re.sub(r'\([^)]*\)', '', menu)
+          menu = re.sub(r'\d+,\d+\s*Euro', '', menu)
+          lines = menu.split("\n")[1:]
+          menu  = "\n".join(lines)
+          menu  = re.sub(r'[ \t]+\n', '\n', menu)
+          menu  = re.sub(r'\n{3,}', '\n\n', menu)
+          menu  = menu.strip()
+
+          with open("menu.txt", "w", encoding="utf-8") as f:
+              f.write(menu)
+
+          print("Gespeichert:\n" + menu)
+          EOF
+
+      - name: menu.txt committen
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+          git add menu.txt
+          git commit -m "Speiseplan aktualisiert" || echo "Keine Änderung"
+          git push
